@@ -1,7 +1,5 @@
 extern crate gtk;
 extern crate reqwest;
-extern crate gdk;
-extern crate glib;
 extern crate select;
 
 use gtk::prelude::*;
