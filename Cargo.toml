@@ -10,5 +10,3 @@ default = ["gtk/v3_12"]
 gtk="^0"
 select = "*"
 reqwest="*"
-gdk="*"
-glib="*"
