@@ -1,6 +1,4 @@
 extern crate reqwest;
-extern crate gtk;
-extern crate gdk;
 
 use std::fs;
 use std::env;
