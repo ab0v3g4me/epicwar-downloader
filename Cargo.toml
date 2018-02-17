@@ -1,0 +1,14 @@
+[package]
+name = "epicwar-crawler"
+version = "0.1.0"
+authors = ["abovegame"]
+
+[features]
+default = ["gtk/v3_12"]
+
+[dependencies]
+gtk="^0"
+select = "*"
+reqwest="*"
+gdk="*"
+glib="*"

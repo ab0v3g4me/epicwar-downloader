@@ -1,0 +1,17 @@
+button {
+  font: 12px "Comic Sans";
+  border-radius: 10px;
+}
+button:hover {
+  background-color: grey;
+}
+
+progressbar {
+  -GtkProgressBar-min-horizontal-bar-height: 10;
+  padding: 8px;
+}
+
+label {
+  color: orange;
+  font: 12px "Comic Sans";
+}
