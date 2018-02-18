@@ -222,7 +222,7 @@ impl  App {
                     };
                     //println!("Reciever {:?}",prog );
                     pb_clone.set_fraction(prog);
-                    if  prog == 1.0 { b.set_label("Done");return gtk::Continue(false); }
+                    if  prog == 1.0 { b.set_label("Finished");return gtk::Continue(false); }
                     gtk::Continue(true)
                 });
 
