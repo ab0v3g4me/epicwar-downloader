@@ -44,7 +44,7 @@ impl  App {
 
         hb.pack_start(&crawl_button);
 
-        let spin_adj = gtk::Adjustment::new(1.0,1.0,5.0,1.0,1.0,0.0);
+        let spin_adj = gtk::Adjustment::new(1.0,1.0,100.0,1.0,1.0,0.0);
         let spin_button = gtk::SpinButton::new(&spin_adj,1.0,0);
 
         hb.pack_start(&spin_button);
