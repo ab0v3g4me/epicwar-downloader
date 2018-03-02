@@ -74,7 +74,9 @@ impl  App {
 
 
         crawl_button.connect_clicked(move |b|{
+
             b.set_sensitive(false);
+
             let pages = sb.get_value() as usize;
             *max_pages_cloned.lock().unwrap() = pages;
 
@@ -168,12 +170,19 @@ impl  App {
 
             let cond = m.dl_started.clone();
 
-            let bt = gtk::Button::new_with_label("Download");
+            let dl_finished = m.dl_finished.clone();
+            let label = if *dl_finished.lock().unwrap() == true {
+                "Finished"
+            } else {
+                "Download"
+            };
+
+            let bt = gtk::Button::new_with_label(label);
             let bt_style = bt.get_style_context().unwrap();
             bt_style.add_provider(&css_style,gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
             if *cond.lock().unwrap() == true { bt.set_sensitive(false); }
             let mut pb: gtk::ProgressBar;
-            if pb_coll.len() < i + 1{
+            if pb_coll.len() < i + 1 {
                 pb = gtk::ProgressBar::new();
                 let pb_style = pb.get_style_context().unwrap();
                 pb_style.add_provider(&css_style,gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -195,6 +204,7 @@ impl  App {
 
             let pb_clone = pb.clone();
             let cond = cond.clone();
+            let dl_finished = m.dl_finished.clone();
             bt.connect_clicked(move |b|{
                 *cond.lock().unwrap() = true;
                 b.set_sensitive(false);
@@ -214,15 +224,19 @@ impl  App {
 
                 let pb_clone = pb_clone.clone();
                 let b = b.clone();
-
+                let dl_finished = dl_finished.clone();
                 gtk::timeout_add(500,move ||{
                     let prog = match rx.try_recv(){
                         Ok(v) => v,
                         Err(_) => 0.0,
                     };
-                    //println!("Reciever {:?}",prog );
+
                     pb_clone.set_fraction(prog);
-                    if  prog == 1.0 { b.set_label("Finished");return gtk::Continue(false); }
+                    if  prog == 1.0 {
+                        println!("Finished");
+                        *dl_finished.lock().unwrap() = true;
+                        b.set_label("Finished");
+                        return gtk::Continue(false); }
                     gtk::Continue(true)
                 });
 
@@ -253,7 +267,7 @@ impl  App {
             let map_link = class.find(Name("a")).nth(1).unwrap().attr("href").unwrap().to_owned();
             let file_name = class.find(Name("a")).nth(1).unwrap().text();
 
-            let mut m =  WC3Map::new(author, map_name, max_players,map_link,file_name,Arc::new(Mutex::new(false)));
+            let mut m =  WC3Map::new(author, map_name, max_players,map_link,file_name,Arc::new(Mutex::new(false)),Arc::new(Mutex::new(false)));
             wc3db.lock().unwrap().push(m);
         }
     }
