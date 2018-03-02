@@ -14,11 +14,12 @@ pub struct WC3Map {
     pub map_link: String,
     pub file_name: String,
     pub dl_started: Arc<Mutex<bool>>,
+    pub dl_finished: Arc<Mutex<bool>>,
 }
 
 impl WC3Map {
     const BASEURL: &'static str = "https://www.epicwar.com";
-    pub fn new(author: String,map_name: String, max_players: String,map_link: String,file_name: String,dl_started: Arc<Mutex<bool>>) -> Self {
+    pub fn new(author: String,map_name: String, max_players: String,map_link: String,file_name: String,dl_started: Arc<Mutex<bool>>,dl_finished: Arc<Mutex<bool>>) -> Self {
         WC3Map {
             author: author,
             map_name: map_name,
@@ -26,6 +27,7 @@ impl WC3Map {
             map_link: map_link,
             file_name: file_name,
             dl_started: dl_started,
+            dl_finished: dl_finished,
         }
     }
     pub fn download(file_name: String,link: String,tx: mpsc::SyncSender<f64>) -> Result<String,String> {
@@ -84,6 +86,7 @@ impl clone::Clone for WC3Map {
                     self.max_players.clone(),
                     self.map_link.clone(),
                     self.file_name.clone(),
-                    self.dl_started.clone())
+                    self.dl_started.clone(),
+                    self.dl_finished.clone())
     }
 }
