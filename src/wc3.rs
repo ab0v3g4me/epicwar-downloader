@@ -1,92 +1,118 @@
 extern crate reqwest;
+extern crate select;
 
 use std::fs;
 use std::env;
 use std::io::{Write,Read};
 use std::clone;
-use std::sync::mpsc;
+use std::sync::mpsc::Receiver;
 use std::sync::{Arc,Mutex};
+use std::str;
+use select::predicate::{Not,Class, Name,Attr};
+use gui::map_box::ButtonState;
 
+#[derive(Clone)]
 pub struct WC3Map {
     author: String,
     map_name: String,
-    max_players: String,
+    pub max_players: String,
     pub map_link: String,
     pub file_name: String,
-    pub dl_started: Arc<Mutex<bool>>,
-    pub dl_finished: Arc<Mutex<bool>>,
 }
 
 impl WC3Map {
     const BASEURL: &'static str = "https://www.epicwar.com";
-    pub fn new(author: String,map_name: String, max_players: String,map_link: String,file_name: String,dl_started: Arc<Mutex<bool>>,dl_finished: Arc<Mutex<bool>>) -> Self {
+    pub fn new(author: String,
+               map_name: String, 
+               max_players: String,
+               map_link: String,
+               file_name: String) -> Self {
+        
         WC3Map {
             author: author,
             map_name: map_name,
             max_players: max_players,
             map_link: map_link,
             file_name: file_name,
-            dl_started: dl_started,
-            dl_finished: dl_finished,
         }
     }
-    pub fn download(file_name: String,link: String,tx: mpsc::SyncSender<f64>) -> Result<String,String> {
-        let fullurl = format!("{}{}",Self::BASEURL, link);
-/*        let c = reqwest::Client::new();
-        let mut r = match c.get(&fullurl[..])
-        .header(reqwest::header::UserAgent::new("Mozilla/5.0 (X11; Linux x86_64; rv:58.0) Gecko/20100101 Firefox/58.0"))
-        .send(){
-            Ok(r) => r,
-            Err(_) => return Err("Failed".to_owned()),
-        };*/
+    pub fn download(map: Arc<Self>,state: Arc<Mutex<ButtonState>>) {
+        let fullurl = format!("{}{}",Self::BASEURL, map.map_link);
 
-        let mut r = match reqwest::get(fullurl.as_str()) {
-                Ok(r) => r,
-                Err(_) => return Err("Download failed.".to_owned()),
+        let mut response = if let Ok(r) = reqwest::get(&fullurl[..]) {
+            r
+        } else {
+            if let Ok(mut data) = state.lock() {
+                *data = ButtonState::Failed;
+            }
+            return;
         };
 
-        let mut total_size = 1.0;
-        match r.headers().get::<reqwest::header::ContentLength>() {
-              Some(length) => { total_size = length.to_le() as f64; },
-              None => (),
+        let total_size = if let Some(length) = response.headers().get("content-length") {
+            length.to_str().unwrap().parse::<f64>().unwrap()
+        } else {
+            if let Ok(mut data) = state.lock() {
+                *data = ButtonState::Failed;
+            }
+            return;
         };
         let p = String::from(env::current_exe().unwrap().parent().unwrap().to_str().unwrap());
-        let p = format!("{}/maps/{}",p,file_name.clone());
+        let p = format!("{}/maps/{}",p,map.file_name);
         let mut f = fs::File::create(p).unwrap();
         let mut dled = 0.0;
 
         loop {
+            if let Ok(data) = state.lock() {
+                if *data == ButtonState::Idle {
+                    break;
+                }
+            }
+            if dled >= total_size {
+                if let Ok(mut data) = state.lock() {
+                    *data = ButtonState::Finished;
+                }
+            }
+            
             let mut buff = [0;4096];
-
-            match r.read(&mut buff) {
-                Ok(0) => break,
-                Ok(b) => { let _ = f.write(&mut buff);dled += b as f64;},
-                Err(_) => break,
-            };
-            tx.send( dled / total_size ).unwrap();
+            if let Ok(bytes) = response.read(&mut buff) {
+                let _ = f.write(&mut buff);
+                dled += bytes as f64;
+            } else {
+                continue;
+            }
         }
-
-        Ok("Done".to_owned())
     }
     pub fn get_map_info(&self) -> String {
-        format!("{} by {}",self.map_name,self.author)
+        format!("{}\ncreated by {}",self.map_name,self.author)
     }
 
     pub fn get_icon_path(&self) -> String {
         let p = String::from(env::current_exe().unwrap().parent().unwrap().to_str().unwrap());
-        let ret_path = format!("{}/icons/{}.gif",p, self.max_players[0..2].trim() );
-        ret_path
+        format!("{}/icons/{}.png",p, self.max_players[0..2].trim() )
     }
 }
 
-impl clone::Clone for WC3Map {
-    fn clone(&self) -> WC3Map {
-        WC3Map::new(self.author.clone(),
-                    self.map_name.clone(),
-                    self.max_players.clone(),
-                    self.map_link.clone(),
-                    self.file_name.clone(),
-                    self.dl_started.clone(),
-                    self.dl_finished.clone())
-    }
+pub fn crawl(c: Arc<reqwest::Client>,wc3db: Arc<Mutex<Vec<WC3Map>>>,i: usize) {
+
+        let url = format!("https://www.epicwar.com/maps/?page={}",i);
+
+        let mut r = c.get(&url[..]).send().unwrap();
+
+        let html = r.text().unwrap();
+        let d = select::document::Document::from(html.as_str());
+        let table = d.find(Name("tbody")).nth(3).unwrap();
+
+        for tr in table.find(Not(Attr("bgcolor","#333333"))){
+            let class = match tr.find(Class("listentry")).nth(1) {
+                Some(c) => c,
+                None => continue,
+            };
+            let map_name = class.find(Name("b")).nth(0).unwrap().text();
+            let author = class.find(Name("b")).nth(1).unwrap().text();
+            let max_players = class.find(Name("img")).nth(0).unwrap().attr("alt").unwrap().to_owned().split_whitespace().next().unwrap().to_owned();           
+            let map_link = class.find(Name("a")).nth(1).unwrap().attr("href").unwrap().to_owned();
+            let file_name = class.find(Name("a")).nth(1).unwrap().text();
+            let mut m =  WC3Map::new(author, map_name, max_players,map_link,file_name);
+            wc3db.lock().unwrap().push(m);
+        }
 }

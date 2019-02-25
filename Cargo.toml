@@ -7,6 +7,7 @@ authors = ["abovegame"]
 default = ["gtk/v3_12"]
 
 [dependencies]
-gtk="^0"
+gtk="*"
+gdk-pixbuf="*"
 select = "*"
 reqwest="*"
